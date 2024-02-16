@@ -5,7 +5,7 @@ A single page serverless, lightweight, responsive, website to call Google's AI l
 - I would advise against hosting this webpage with the apiKey hardcoded as it may pose a risk of being leaked on the internet and Google will disable the apiKey.
 - Additionally, please refrain from using the apiKey provided in the about section, as it is intended only for new users to test quickly.
 
-## How to get OpenAI API key
+## How to get GEMINI API key
 - Go to [Gemini API](https://aistudio.google.com/app/apikey) and get one for yourself. 
 
 ### How to Use
