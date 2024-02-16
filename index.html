@@ -4,7 +4,7 @@
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/300/300221.png" />
-	<title>Gemini API</title>
+	<title>Gemini</title>
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
 	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.7/css/all.css">
 	<script src="https://cdn.staticfile.org/jquery/3.6.3/jquery.min.js"></script>
@@ -189,7 +189,7 @@
 				<div class="card mt-3">
 					<div class="card-header row">
 						<div class="col-6 ">
-							<h3>Gemini API</h3>						
+							<h3>Gemini</h3>						
 						</div>					
 						<div class="col-6 offset-md-3 col-md-3 text-right">	
 							<a  type="button" onclick="window.print()" class="btn  btn-outline-info">Print</a>						
@@ -240,25 +240,7 @@ const key = url.searchParams.get('key');
 const chatbox = $("#chatbox");
 const userInput = $("#userInput");
 const sendButton = $("#sendButton");
-let messages = [];
-
-sendButton.on("click", () => {
-    const message = userInput.val();
-    if (message) {
-        messages.push({
-            "role": "user",
-            "text": message
-        });
-		const displaytext = window.markdownit().render(message);
-		let userMessageHtml = '<pre><div class="message right-side "  >' + displaytext + '</div></pre>';
-		chatbox.append(userMessageHtml);
-		chatbox.animate({ scrollTop: 20000000 }, "slow");
-        userInput.val("");
-        sendButton.val("Generating Response...");
-		sendButton.prop("disabled", true);
-        fetchMessages(message);
-    }
-});
+let contents = [];
 
 userInput.on("keydown", (event) => {
     if (event.keyCode === 13 && !event.ctrlKey && !event.shiftKey) {
@@ -279,33 +261,53 @@ userInput.on("keydown", (event) => {
     }
 });
 
-function fetchMessages(message) {
-	const apiKey = $("#apiKey").val();
-	var settings = {
-		  "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey,
-		  "method": "POST",
-		  "timeout": 0,
-		  "headers": {
-			"Content-Type": "application/json"
-		  },
-		  "data": JSON.stringify({
-			"contents": [
-			  {
-				"parts": [
-				  {
-					"text": message
-				  }
-				]
-			  }
-			]
-		  }),
+sendButton.on("click", () => {
+    const message = userInput.val();
+    if (message) {
+        contents.push({
+            "role": "user",
+            "parts": [
+                {
+                    "text": message
+                }
+            ]
+        });
+
+        const displaytext = window.markdownit().render(message);
+        let userMessageHtml = '<pre><div class="message right-side "  >' + displaytext + '</div></pre>';
+        chatbox.append(userMessageHtml);
+        chatbox.animate({ scrollTop: 20000000 }, "slow");
+        userInput.val("");
+        sendButton.val("Generating Response...");
+        sendButton.prop("disabled", true);
+        fetchMessages();
+    }
+});
+
+function fetchMessages() {
+		const apiKey = $("#apiKey").val();
+		var settings = {
+			"url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey,
+			"method": "POST",
+			"timeout": 0,
+			"headers": {
+				"Content-Type": "application/json"
+			},
+
+			"data": JSON.stringify({
+				"contents": contents
+			})
 		};
-$.ajax(settings).done(function (response) {
-  console.log(response);
+		$.ajax(settings).done(function (response) {
+			console.log(response);
 			const reply = response.candidates[0].content;
-			messages.push({
+			contents.push({
 				"role": reply.role,
-				"text": reply.parts[0].text
+				"parts": [
+					{
+						"text": reply.parts[0].text
+					}
+				]
 			});
 			const htmlText = window.markdownit().render(reply.parts[0].text);
 			const botMessageHtml = '<pre><div class="message left-side" id="' + CryptoJS.MD5(htmlText) + '">' + htmlText + '</div><i class="far fa-clipboard ml-1 btn btn-outline-dark" id="' + CryptoJS.MD5(htmlText) + '-copy"></i></pre>';             
