@@ -203,9 +203,10 @@
 							<textarea id="userInput" rows="1" class="form-control dark-theme" placeholder="Type your message here..."></textarea>
 						</div>
 						<div class="col-md-3">
-							<label for="userfile" class="btn btn-secondary btn-block">
-								<i class="bi bi-image"></i> <span id="fileLabel">Choose an Image to get its Details.</span>
-								<input type="file" name="file" id="userfile" class="form-control" style="display: none;" onchange="updateFileLabel()">
+							<label for="userfile" class="btn btn-secondary btn-block ">
+								<i class="bi bi-image "></i> <span id="fileLabel">Choose an Image to get its Details</span>
+								<input type="file" name="file" id="userfile" accept="image/*" class="form-control" style="display: none;" onchange="updateFileLabel()">
+								<img id="output" width="40" height="25" style="display: none;" class="float-right "/>
 							</label>
 						</div>
 						<div class="col-md-2">
@@ -223,11 +224,19 @@
     function updateFileLabel() {
         const fileInput = document.getElementById("userfile");
         const fileLabel = document.getElementById("fileLabel");
-
-        if (fileInput.files.length > 0) {
-            fileLabel.innerText = fileInput.files[0].name;
+		const image = document.getElementById('output');
+		const file = fileInput.files[0];
+		
+        if (fileInput.files.length > 0) {			
+			const maxLength = 25; // Set your desired maximum length
+			const fileName = file.name.length > maxLength ? file.name.substring(0, maxLength) + "..." : file.name;
+ 
+            fileLabel.innerText = fileName;
+			image.style.display = 'block';
+			image.src = URL.createObjectURL(file);
         } else {
-            fileLabel.innerText = "Choose Image";
+            fileLabel.innerText = "Choose an Image to get its Details";
+			image.style.display = 'none';
         }
     }
 </script>
@@ -298,21 +307,25 @@ sendButton.on("click", () => {
     alert("Please provide Text or Image input.");
     return; 
   }
+if (input && input.files.length > 0) {
+	const file = input.files[0];
+	const imgsrc = URL.createObjectURL(file);
+
+  getBase64Image(file).then((base64String) => {
   
-	const displaytext = window.markdownit().render(message);
+  if (message === "") {
+	let userMessageHtml = '<pre><div class="message right-side "  ><img class="img-thumbnail mb-2" width="400" src=" ' + imgsrc + ' "/></div></pre>';
+	chatbox.append(userMessageHtml);  
+    fetchreply(message, base64String);
+	}
+  else {
+    const displaytext = window.markdownit().render(message);
 	let userMessageHtml = '<pre><div class="message right-side "  >' + displaytext + '</div></pre>';
-	chatbox.append(userMessageHtml);
-    chatbox.animate({ scrollTop: 20000000 }, "slow");
-    userInput.val("");
-    sendButton.val("Generating Response...");
-    sendButton.prop("disabled", true);              
-	
-    if (input && input.files.length > 0) {
-        const file = input.files[0];
-        getBase64Image(file).then((base64String) => {
-		fetchreply(message,base64String);                   
-        })
-	  }    
+    chatbox.append(userMessageHtml);  
+    fetchreply(message, base64String);
+	}		
+  });
+}
 else {
     if (message) {
         contents.push({
@@ -323,10 +336,16 @@ else {
                 }
             ]
         });
-const displaytext = window.markdownit().render(message);       
+const displaytext = window.markdownit().render(message); 
+	let userMessageHtml = '<pre><div class="message right-side "  >' + displaytext + '</div></pre>';
+	chatbox.append(userMessageHtml);      
         fetchMessages();
 		}
 	}
+	chatbox.animate({ scrollTop: 20000000 }, "slow");
+    userInput.val("");
+    sendButton.val("Generating Response...");
+    sendButton.prop("disabled", true); 
 });
 
 
