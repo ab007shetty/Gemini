@@ -45,7 +45,7 @@
 		}	
 		.popup {
 			position: fixed;
-			bottom: 20vh;
+			bottom: 30vh;
 			left: 50%;
 			transform: translateX(-50%);
 			background-color: rgba(0, 0, 0, 0.6);
@@ -197,15 +197,21 @@
 						</div>
 					</div>
 					<div class="card-body chat-box rounded p1" id="chatbox"><span id="copy-popup" class="popup">Copied!</span></div>
-					<div class="card-footer">
-						<div class="form-group row">
-							<div class="col-md-10 mb-1">
-								<textarea id="userInput" rows="1" class="form-control dark-theme" placeholder="Type your message here..." ></textarea>
-							</div>
-							<div class="col-md-2">
-								<input id="sendButton" type="button" value="SUBMIT" class=" form-control btn btn-success btn-block " />
-							</div>	
+					<div class="card-footer">					
+					<div class="form-group row">
+						<div class="col-md-7 mb-1">
+							<textarea id="userInput" rows="1" class="form-control dark-theme" placeholder="Type your message here..."></textarea>
 						</div>
+						<div class="col-md-3">
+							<label for="userfile" class="btn btn-secondary btn-block">
+								<i class="bi bi-image"></i> <span id="fileLabel">Choose an Image to get its Details.</span>
+								<input type="file" name="file" id="userfile" class="form-control" style="display: none;" onchange="updateFileLabel()">
+							</label>
+						</div>
+						<div class="col-md-2">
+							<input id="sendButton" type="button" value="SUBMIT" class=" form-control btn btn-success btn-block " />
+						</div>
+					</div>						
 					</div>
 				</div>
 			</div>
@@ -213,6 +219,18 @@
 	</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
+<script>
+    function updateFileLabel() {
+        const fileInput = document.getElementById("userfile");
+        const fileLabel = document.getElementById("fileLabel");
+
+        if (fileInput.files.length > 0) {
+            fileLabel.innerText = fileInput.files[0].name;
+        } else {
+            fileLabel.innerText = "Choose Image";
+        }
+    }
+</script>
 <script>
 const toggleSwitch = document.querySelector('#darkModeToggle');
 toggleSwitch.addEventListener('change', switchTheme);
@@ -239,6 +257,7 @@ const key = url.searchParams.get('key');
     }	
 const chatbox = $("#chatbox");
 const userInput = $("#userInput");
+const file = $("#userfile");
 const sendButton = $("#sendButton");
 let contents = [];
 
@@ -261,8 +280,40 @@ userInput.on("keydown", (event) => {
     }
 });
 
+const getBase64Image = (file) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    return new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = (error) => reject(error);
+    });
+};
+
+
 sendButton.on("click", () => {
-    const message = userInput.val();
+    const input = document.getElementById("userfile");	
+	const message = userInput.val();
+
+	if (message === "" && input.files.length === 0) {
+    alert("Please provide Text or Image input.");
+    return; 
+  }
+  
+	const displaytext = window.markdownit().render(message);
+	let userMessageHtml = '<pre><div class="message right-side "  >' + displaytext + '</div></pre>';
+	chatbox.append(userMessageHtml);
+    chatbox.animate({ scrollTop: 20000000 }, "slow");
+    userInput.val("");
+    sendButton.val("Generating Response...");
+    sendButton.prop("disabled", true);              
+	
+    if (input && input.files.length > 0) {
+        const file = input.files[0];
+        getBase64Image(file).then((base64String) => {
+		fetchreply(message,base64String);                   
+        })
+	  }    
+else {
     if (message) {
         contents.push({
             "role": "user",
@@ -272,18 +323,44 @@ sendButton.on("click", () => {
                 }
             ]
         });
-
-        const displaytext = window.markdownit().render(message);
-        let userMessageHtml = '<pre><div class="message right-side "  >' + displaytext + '</div></pre>';
-        chatbox.append(userMessageHtml);
-        chatbox.animate({ scrollTop: 20000000 }, "slow");
-        userInput.val("");
-        sendButton.val("Generating Response...");
-        sendButton.prop("disabled", true);
+const displaytext = window.markdownit().render(message);       
         fetchMessages();
-    }
+		}
+	}
 });
 
+
+function fetchreply(message,base64String) {
+		const apiKey = $("#apiKey").val();
+		var settings = {
+  "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=" + apiKey,
+  "method": "POST",
+  "timeout": 0,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "data": JSON.stringify({
+			"contents": [
+			  {
+				"parts": [
+				  {
+					"text": message
+				  },
+				  {
+					"inline_data": {
+					  "mime_type": "image/jpeg",
+					   "data": base64String
+					}
+				  }
+				]
+			  }
+			]
+			})
+};
+$.ajax(settings).done(function(response) { processAjaxResponse(response); })
+		.fail(function(jqXHR, textStatus, errorThrown) { handleAjaxFailure(jqXHR);});
+}
+	
 function fetchMessages() {
 		const apiKey = $("#apiKey").val();
 		var settings = {
@@ -297,53 +374,61 @@ function fetchMessages() {
 			"data": JSON.stringify({
 				"contents": contents
 			})
-		};
-		$.ajax(settings).done(function (response) {
-			console.log(response);
-			const reply = response.candidates[0].content;
-			contents.push({
-				"role": reply.role,
-				"parts": [
-					{
-						"text": reply.parts[0].text
-					}
-				]
-			});
-			const htmlText = window.markdownit().render(reply.parts[0].text);
-			const botMessageHtml = '<pre><div class="message left-side" id="' + CryptoJS.MD5(htmlText) + '">' + htmlText + '</div><i class="far fa-clipboard ml-1 btn btn-outline-dark" id="' + CryptoJS.MD5(htmlText) + '-copy"></i></pre>';             
+		}; 
+		$.ajax(settings).done(function(response) { processAjaxResponse(response); })
+		.fail(function(jqXHR, textStatus, errorThrown) { handleAjaxFailure(jqXHR);});
+}
 
-            chatbox.append(botMessageHtml);	
+function processAjaxResponse(response) {
+    console.log(response);
+    const reply = response.candidates[0].content;
+    contents.push({
+        "role": reply.role,
+        "parts": [{
+            "text": reply.parts[0].text
+        }]
+    });
+    const htmlText = window.markdownit().render(reply.parts[0].text);
+    const botMessageHtml = '<pre><div class="message left-side" id="' + CryptoJS.MD5(htmlText) + '">' + htmlText + '</div><i class="far fa-clipboard ml-1 btn btn-outline-dark" id="' + CryptoJS.MD5(htmlText) + '-copy"></i></pre>';
 
-			// Add event listener to the copy icon 
-			var copyIcon = document.getElementById(CryptoJS.MD5(htmlText) + '-copy'); 
-			var copyText = document.getElementById(CryptoJS.MD5(htmlText));
+    chatbox.append(botMessageHtml);
 
-			copyIcon.addEventListener("click", function() {
-			  var tempTextarea = document.createElement("textarea");
-			  tempTextarea.value = copyText.textContent;
-			  document.body.appendChild(tempTextarea);
-			  tempTextarea.select();
-			  document.execCommand("copy");
-			  document.body.removeChild(tempTextarea);
-			  
-			  // Display "Copied!" popup
-			  var copyPopup = document.getElementById("copy-popup");
-			  copyPopup.style.display = "block";
-			  setTimeout(function() {
-				copyPopup.style.display = "none";
-			  }, 1000); // Display for 1 second
-			});
-			
-			chatbox.animate({ scrollTop: 20000000 }, "slow");
-            sendButton.val("SUBMIT");
-            sendButton.prop("disabled", false);
-        }).fail(function(jqXHR, textStatus, errorThrown) {
-			sendButton.val("Error");
-			let errorText = "Error: " + jqXHR.responseJSON.error.message;
-			let errorMessage = '<pre><div class="message left-side  text-danger" >' + errorText + '</div></pre>';
-			chatbox.append(errorMessage);
-			chatbox.animate({ scrollTop: 20000000 }, "slow");
-		});
-    }
+    // Add event listener to the copy icon 
+    var copyIcon = document.getElementById(CryptoJS.MD5(htmlText) + '-copy');
+    var copyText = document.getElementById(CryptoJS.MD5(htmlText));
+
+    copyIcon.addEventListener("click", function () {
+        var tempTextarea = document.createElement("textarea");
+        tempTextarea.value = copyText.textContent;
+        document.body.appendChild(tempTextarea);
+        tempTextarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempTextarea);
+
+        // Display "Copied!" popup
+        var copyPopup = document.getElementById("copy-popup");
+        copyPopup.style.display = "block";
+        setTimeout(function () {
+            copyPopup.style.display = "none";
+        }, 1000); // Display for 1 second
+    });
+
+    chatbox.animate({
+        scrollTop: 20000000
+    }, "slow");
+    sendButton.val("SUBMIT");
+    sendButton.prop("disabled", false);
+}
+
+function handleAjaxFailure(jqXHR) {
+    // Handle failure
+    sendButton.val("Error");
+    let errorText = "Error: " + jqXHR.responseJSON.error.message;
+    let errorMessage = '<pre><div class="message left-side text-danger" >' + errorText + '</div></pre>';
+    chatbox.append(errorMessage);
+    chatbox.animate({
+        scrollTop: 20000000
+    }, "slow");
+}   
 </script>
 </html>
